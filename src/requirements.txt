@@ -1,0 +1,11 @@
+python-dotenv
+langchain
+openai
+tiktoken
+faiss-cpu
+wikipedia
+streamlit
+streamlit-chat
+pyodbc
+sqlalchemy
+pandas

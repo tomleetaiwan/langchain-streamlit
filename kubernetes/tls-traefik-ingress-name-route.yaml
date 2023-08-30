@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streamlit-app-name-route
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+        
+spec:
+  tls:
+    - hosts:
+      - <您的 domain name>
+      secretName: ingress-secret <您的 TLS 憑證 Secret>
+      
+  rules:
+  - host: <您的 domain name>
+    http:
+      paths:
+      - pathType: Prefix 
+        path: "/"
+        backend:
+          service:
+            name: streamlit-app-svc
+            port: 
+              number: 80
