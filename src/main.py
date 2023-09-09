@@ -1,5 +1,5 @@
 #  執行方式 streamlit run main.py
-
+#
 import os
 import json
 import streamlit as st
@@ -44,50 +44,67 @@ def init():
     )
 
 def question_filter(input_str):
-    prompt = PromptTemplate(input_variables=["prompt_str"],template="事實:{prompt_str}\n" \
+    try:
+        prompt = PromptTemplate(input_variables=["prompt_str"],template="事實:{prompt_str}\n" \
                                              "事實中這句話的意圖是查詢嗎? 如果是並此問題可以在 Wikipedia 上查得到請回答一個字母 [Y]\n" \
                                              "事實中這句話的意圖是查詢嗎? 如果是並此問題無法在 Wikipedia 上查得到請回答一個字母 [N]\n" \
                                              "如果事實這句話的意圖不是查詢，請回答一個字母 [C]\n")
-    # 將 AzureChatOpenAI 以 LLMChain 方式使用
-    chain = LLMChain(llm=chat,prompt=prompt)
-    response = chain.run(input_str)
+        # 將 AzureChatOpenAI 以 LLMChain 方式使用
+        chain = LLMChain(llm=chat,prompt=prompt)
+        response = chain.run(input_str)
+    except Exception as e:
+        print("發生錯誤: ", e)
+        response = "發生了一點技術問題，我無法連線到 Azure OpenAI Service，請稍後再試"        
     return(response)
 
 def get_query_english_keyword(input_str):
-    prompt = PromptTemplate(input_variables=["prompt_str"],template="事實:{prompt_str}\n" \
-                                            "將事實轉換為一句包含關鍵字的英文\n" \
-                                            "English Fact:")
-    # 將 AzureChatOpenAI 以 LLMChain 方式使用
-    chain = LLMChain(llm=chat,prompt=prompt)
-    response = chain.run(input_str)
+    try:
+        prompt = PromptTemplate(input_variables=["prompt_str"],template="事實:{prompt_str}\n" \
+                                                "將事實轉換為一句包含關鍵字的英文\n" \
+                                                "English Fact:")
+        # 將 AzureChatOpenAI 以 LLMChain 方式使用
+        chain = LLMChain(llm=chat,prompt=prompt)
+        response = chain.run(input_str)
+    except Exception as e:
+        print("發生錯誤: ", e)
+        response = "發生了一點技術問題，我無法連線到 Azure OpenAI Service，請稍後再試"
     return(response)
 
 def embeddings_query(input_str):
-    # 查詢文字轉換為 OpenAI Embeddings 向量值，再轉為 JSON 格式字串
-    response = embeddings.embed_query(input_str)
-    json_str = json.dumps(response)
-    # 查出最新相關的 3 個條目
-    sql = "select top 3 cosine_distance,title,url from dbo.SimilarContentArticles ('"+ json_str + "') as r order by cosine_distance desc"
-    # 查詢結果置於 DataFrame    
-    with sql_engine.begin() as conn:
-        output_df = pd.read_sql_query(sa.text(sql), conn)        
+    try:
+        # 查詢文字轉換為 OpenAI Embeddings 向量值，再轉為 JSON 格式字串
+        response = embeddings.embed_query(input_str)
+        json_str = json.dumps(response)        
+        # 查出最新相關的 3 個條目
+        sql = "select top 3 cosine_distance,title,url from dbo.SimilarContentArticles ('"+ json_str + "') as r order by cosine_distance desc"
+        # 查詢結果置於 DataFrame    
+        with sql_engine.connect() as conn:
+            output_df = pd.read_sql_query(sa.text(sql), conn)              
+    except Exception as e:
+        print("發生錯誤: ", e)
+        # 錯誤代處理
+        output_df = pd.DataFrame()
     return (output_df)
 
 def answer_summary (input_str,title):
-    # 取得 Simple English Wikipedia 的網頁內容
-    docs = WikipediaLoader(query=title, load_max_docs=1).load()
-    html_body = docs[0].page_content[:2000]  
+    try:
+        # 取得 Simple English Wikipedia 的網頁內容
+        docs = WikipediaLoader(query=title, load_max_docs=1).load()
+        html_body = docs[0].page_content[:2000]    
+        # 將網頁內容轉換為摘要
+        prompt = PromptTemplate(input_variables=["question_str","html_str"],template="事實:{question_str}\n" \
+                                                "HTML:{html_str}\n" \
+                                                "解析 HTML 的內容，依據這些內容以一百字摘要的方式，用繁體中文回答事實內提出的問題，" \
+                                                "如果 HTML 解析出來的內容無法回答事實內的問題，則回覆 '很抱歉我不知道答案，這是最接近的條目'" \
+                                                "回覆:")
 
-    # 將網頁內容轉換為摘要
-    prompt = PromptTemplate(input_variables=["question_str","html_str"],template="事實:{question_str}\n" \
-                                            "HTML:{html_str}\n" \
-                                            "解析 HTML 的內容，依據這些內容以一百字摘要的方式，用繁體中文回答事實內提出的問題，" \
-                                            "如果 HTML 解析出來的內容無法回答事實內的問題，則回覆 '很抱歉我不知道答案，這是最接近的條目'" \
-                                            "回覆:")
-
-    # 將 AzureChatOpenAI 以 LLMChain 方式使用
-    chain = LLMChain(llm=chat,prompt=prompt)
-    response = chain.run(question_str=input_str,html_str=html_body)
+        # 將 AzureChatOpenAI 以 LLMChain 方式使用
+        chain = LLMChain(llm=chat,prompt=prompt)
+        response = chain.run(question_str=input_str,html_str=html_body)
+    except Exception as e:
+        print("發生錯誤: ", e)
+        # 發生錯誤時的回覆
+        response = "資料庫連線或是 Wikipedia 內容載入發生了一點技術問題，我無法正常查詢與回覆內容。"
     return (response)
 
 def main():
@@ -121,11 +138,17 @@ def main():
                     # 顯示向量近似查詢結果於左側窗格
                     st.markdown("比對內容: "+ english_keyword)
                     st.dataframe(respone_df)
+                    
                     # 取得第一個條目的標題，做內容為回覆摘要
-                    respons_str = respons_str + answer_summary (english_keyword,respone_df.iloc[0]['title']) + "\n\n 資料來源: \n"
-                    # 將最接近的三個條目的網址加入參考資料
-                    for index, row in respone_df.iterrows():
-                        respons_str = respons_str + str(index+1)+". [*" + row['title'] + "*](" +  row['url'] + ") \n"                        
+                    if (len(respone_df.index)>0):
+                        print (len(respone_df.index))
+                        respons_str = respons_str + answer_summary (english_keyword,respone_df.iloc[0]['title']) + "\n\n 資料來源: \n"
+                        # 將最接近的三個條目的網址加入參考資料
+                        for index, row in respone_df.iterrows():
+                            respons_str = respons_str + str(index+1)+". [*" + row['title'] + "*](" +  row['url'] + ") \n"                        
+                    else:
+                       respons_str = "LangChain 的 Wikipedia Loader 載入內容時發生了一點技術問題，我無法彙整出摘要。"     
+                    
                     st.session_state.messages.append(AIMessage(content=respons_str))
                 else:
                     if question_type == 'C':
@@ -135,7 +158,7 @@ def main():
                         st.session_state.messages.append(AIMessage(content=response.content))
                     else:
                         # 處理無法回覆之查詢問題 
-                        st.session_state.messages.append(AIMessage(content="抱歉，我不知道 ..."))
+                        st.session_state.messages.append(AIMessage(content="很抱歉，我不知道 ..."))
                 
     # 顯示對話歷史紀錄
     messages = st.session_state.get('messages', [])
