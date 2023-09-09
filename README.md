@@ -28,7 +28,7 @@
 - 備妥 Docker 容器環境 (選用)
 - 若在 Linux 環境進行開發，須備妥 [Microsoft ODBC 17 環境](https://learn.microsoft.com/zh-tw/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=alpine18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline#17)
 
-所需的三種模型，可點選 [Azure AI Studio](https://oai.azure.com/portal) 標示之 **Deployments** 選項，即可依序建立部署，請紀錄模型之部署名稱，後續需要輸入環境變數之中。
+所需的兩種模型，可點選 [Azure AI Studio](https://oai.azure.com/portal) 標示之 **Deployments** 選項，即可依序建立部署，請紀錄模型之部署名稱，後續需要輸入環境變數之中。
 
 ## 設定作業系統之環境變數
 本範例採用了 Python dotenv 套件，環境變數也可以寫在 .env 檔案中，例如:
@@ -54,9 +54,9 @@ streamlit run main.py
 
 ## 建置 Container Image
 
-### 在 Dockerfile 所在的資料夾，以 "streamlit-app" 為標籤名稱建立 Container Image，例如
+### 以 "streamlit-app" 為標籤名稱建立 Container Image，例如
 
-在命令列模式下切換至 /src 資料夾，並執行以下指令
+在命令列模式下切換至 /src ，也就是 Dockerfile 所在的資料夾，並執行以下指令
 ```bash
 docker build -t streamlit-app:1 .
 ```
@@ -76,7 +76,7 @@ docker run -dit --name streamlit-app -p 8501:8501 streamlit-app:1
 az acr login --name <您的ACR名稱> 
 ```
 
-2. 將目前本機的 Container Image streamlit-app:1 貼上未來在 Azure Container Registry 的 Tag 命名 streamlit-app:1，假設 Azure Container Registry 名稱為 crtom 則可使用以下指令
+2. 將目前本機的 Container Image streamlit-app:1 貼上未來存放在 Azure Container Registry 內並保有相同名稱的 Tag，可使用以下指令
 ```bash
 docker tag streamlit-app:1 <您的ACR名稱>.azurecr.io/streamlit-app:1
 ```
@@ -85,7 +85,7 @@ docker tag streamlit-app:1 <您的ACR名稱>.azurecr.io/streamlit-app:1
 ```bash
 docker push <您的ACR名稱>.azurecr.io/streamlit-app:1
 ```
-### 若要將 Container Image streamlit-app:1 部署於 Azure Kubernetes Service，並搭配 Traefik 2.10 Ingress Controller 與 TLS 憑證 Secrect 可參考以下方式
+### 若要將 Container Image streamlit-app:1 部署於 Azure Kubernetes Service，並搭配 [Traefik 2 Ingress Controller](https://doc.traefik.io/traefik/) 與 TLS 憑證 Secrect 可參考以下方式
 
 在命令列模式下切換至 /kubernetes 資料夾，並執行以下指令
 
