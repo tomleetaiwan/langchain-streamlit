@@ -1,3 +1,4 @@
+#
 #  執行方式 streamlit run main.py
 #
 import os
@@ -140,8 +141,7 @@ def main():
                     st.dataframe(respone_df)
                     
                     # 取得第一個條目的標題，做內容為回覆摘要
-                    if (len(respone_df.index)>0):
-                        print (len(respone_df.index))
+                    if (len(respone_df.index)>0):                        
                         respons_str = respons_str + answer_summary (english_keyword,respone_df.iloc[0]['title']) + "\n\n 資料來源: \n"
                         # 將最接近的三個條目的網址加入參考資料
                         for index, row in respone_df.iterrows():
