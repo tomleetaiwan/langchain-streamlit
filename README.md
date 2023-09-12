@@ -1,7 +1,9 @@
 # 關於本範例
-本範例是使用 [Streamlit](https://streamlit.io/) 與 [Langchain](https://python.langchain.com/docs/get_started/introduction.html) 搭配 Azure OpenAI Service 實作的對話機器人，並依照 [Vector Similarity Search with Azure SQL database and OpenAI](https://devblogs.microsoft.com/azure-sql/vector-similarity-search-with-azure-sql-database-and-openai/) 一文的說明，將 OpenAI 所提供的 Simple English Wikipedia 主要條目的 Embedding 向量資料儲存於 Azure SQL Database 內，以對話機器人的方式對 Azure SQL Database 進行全文檢索，以餘弦近近似比對的方式找出與 Simple English Wikipedia 內最相近的內容。 程式碼皆位於 src 資料夾內，其餘資料夾不包含程式碼，都與環境部屬相關。若目前尚未有 Azure OpenAI Service 與 LangChain 開發經驗，也可先透過此[中文快速上手 Notebook 加速學習](https://github.com/tomleetaiwan/azure_openai_quick_start)。 
+本範例是使用 [Streamlit](https://streamlit.io/) 與 [Langchain](https://python.langchain.com/docs/get_started/introduction.html) 搭配 Azure OpenAI Service 實作的對話機器人，並依照 [Vector Similarity Search with Azure SQL database and OpenAI](https://devblogs.microsoft.com/azure-sql/vector-similarity-search-with-azure-sql-database-and-openai/) 一文的說明，將 [OpenAI 所提供的 Simple English Wikipedia 主要條目的 Embedding 向量資料](https://cdn.openai.com/API/examples/data/vector_database_wikipedia_articles_embedded.zip) 儲存於 Azure SQL Database 內，以對話機器人的方式對 Azure SQL Database 進行全文檢索，並採用餘弦近似比對的方式找出與 Simple English Wikipedia 內最相近的內容。 程式碼皆位於 src 資料夾內，其餘資料夾不包含程式碼，都與環境部屬相關。若目前尚未有 Azure OpenAI Service 與 LangChain 開發經驗，也可先透過此[中文快速上手 Notebook 加速學習](https://github.com/tomleetaiwan/azure_openai_quick_start)。 
 
 **本範例僅是功能示範，將 OpenAI API Key 與 SQL Server 連接字串儲存於環境變數中並非符合資訊安全的作法，請勿直接使用於對外開放之 Microsoft Azure 環境。**
+
+ ![使用者介面](/images/streamlit-app-ui.png)
 
 ## 環境準備
 
