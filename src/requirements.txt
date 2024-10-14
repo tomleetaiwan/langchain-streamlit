@@ -1,11 +1,13 @@
 python-dotenv
 langchain
-openai
+langchain-core
+langchain-openai
+langchain-community
 tiktoken
-faiss-cpu
 wikipedia
 streamlit
 streamlit-chat
 pyodbc
 sqlalchemy
 pandas
+azure.identity

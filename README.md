@@ -11,24 +11,26 @@
 - 依據 [Vector Similarity Search with Azure SQL database and OpenAI](https://devblogs.microsoft.com/azure-sql/vector-similarity-search-with-azure-sql-database-and-openai/) 備妥向量資料於 Azure SQL Database 內
 - 已經申請核准建立妥 Azure OpenAI Service 資源
 - 已經於 Azure AI Studio 內建立好以下模型之部署 (deployment)
-    + gpt-35-turbo
+    + gpt-4o
     + text-embedding-ada-002        
 - 備妥 Python 3.11 編輯與執行環境
 - 備妥 以下 Python 套件
-    + python-dotenv (1.0.0)
-    + langchain (0.0.250)
-    + openai (0.27.8)
-    + tiktoken (0.4.0)
-    + faiss-cpu (1.7.4)
-    + streamlit (1.26.0)
-    + streamlit-chat (0.1.1)
-    + pyodbc (4.0.39)
-    + sqlalchemy (2.0.19)
-    + wikipedia (1.4.0)
-    + pandas (2.0.3)
+    + python-dotenv
+    + langchain
+    + langchain-core
+    + langchain-openai
+    + langchain-community
+    + tiktoken
+    + wikipedia
+    + streamlit
+    + streamlit-chat
+    + pyodbc
+    + sqlalchemy
+    + pandas
+    + azure.identity
 
 - 備妥 Docker 容器環境 (選用)
-- 若在 Linux 環境進行開發，須備妥 [Microsoft ODBC 17 環境](https://learn.microsoft.com/zh-tw/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=alpine18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline#17)
+- 若在 Linux 環境進行開發，須備妥 [Microsoft ODBC 18 環境](https://learn.microsoft.com/zh-tw/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=alpine18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline#17)
 
 所需的兩種模型，可點選 [Azure AI Studio](https://oai.azure.com/portal) 標示之 **Deployments** 選項，即可依序建立部署，請紀錄模型之部署名稱，後續需要輸入環境變數之中。
 
@@ -36,14 +38,69 @@
 本範例採用了 Python dotenv 套件，環境變數也可以寫在 .env 檔案中，例如:
 
 ```bash
-OPENAI_API_KEY=1234567890abcdef1234567890abcdef
-OPENAI_API_BASE=https://<您的 Azure OpenAI 資源名稱>.openai.azure.com/
-DEPLOYMENT_NAME=gpt-35-turbo
-OPENAI_API_VERSION=2023-05-15
-OPENAI_API_TYPE=azure
-SQL_CONNECTION_STRING=Driver={ODBC Driver 17 for SQL Server};Server=tcp:<資料庫伺服器名稱>.database.windows.net,1433;Database=openai;Uid=<登入帳號>;Pwd=<登入密碼>;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=120;
+AZURE_OPENAI_API_KEY=1234567890abcdef1234567890abcdef
+AZURE_OPENAI_ENDPOINTE=https://<您的 Azure OpenAI 資源名稱>.openai.azure.com/
+AZURE_OPENAI_API_VERSION=2023-05-15
+CHAT_DEPLOYMENT_NAME=gpt-4o
+EMBEDDINS_DEPLOYMENT_NAME=text-embedding-ada-002
+SQL_CONNECTION_STRING=Driver={ODBC Driver 18 for SQL Server};Server=tcp:<資料庫伺服器名稱>.database.windows.net,1433;Database=<資料庫名稱>;Uid=<登入帳號>;Pwd=<登入密碼>;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
 ```
 Pyhotn dotenv 套件使用之 .env 檔案請置於 src 資料夾內。
+
+## 使用 Microsoft Entra ID 進行 Azure SQL Database 無密碼身分驗證
+
+若使用 Microsoft Entra ID 進行 Azure SQL Database 身分驗證，請將 SQL_CONNECTION_STRING 改為以下格式
+
+```bash
+SQL_CONNECTION_STRING=Driver={ODBC Driver 18 for SQL Server};Server=tcp:<資料庫伺服器名稱>.database.windows.net,1433;Database=<資料庫名稱;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
+```
+pyodbc 在開發環境若用目前已經登入成功之身分驗證 Credential 進行身分驗證，可使用以下程式碼
+``` Python
+import os
+import pyodbc, struct
+from azure.identity import DefaultAzureCredential
+
+def get_conn():
+    connection_string = os.getenv("SQL_CONNECTION_STRING")
+    credential = DefaultAzureCredential(exclude_interactive_browser_credential=False)
+    token_bytes = credential.get_token("https://database.windows.net/.default").token.encode("UTF-16-LE")
+    token_struct = struct.pack(f'<I{len(token_bytes)}s', len(token_bytes), token_bytes)
+    SQL_COPT_SS_ACCESS_TOKEN = 1256  # This connection option is defined by microsoft in msodbcsql.h
+    conn = pyodbc.connect(connection_string, attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct})
+    return conn
+```
+而 SQLAlchemy 2.0 在開發環境若用目前已經登入成功之身分驗證 Credential 進行身分驗證，可使用以下程式碼
+``` Python
+import struct
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine.url import URL
+from azure import identity
+
+connection_string = os.getenv("SQL_CONNECTION_STRING")
+
+SQL_COPT_SS_ACCESS_TOKEN = 1256  # Connection option for access tokens, as defined in msodbcsql.h
+TOKEN_URL = "https://database.windows.net/"  # The token URL for any Azure SQL database
+
+connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+sql_engine = create_engine(connection_url)
+azure_credentials = identity.DefaultAzureCredential()
+
+@event.listens_for(sql_engine, "do_connect")
+def provide_token(dialect, conn_rec, cargs, cparams):
+    # remove the "Trusted_Connection" parameter that SQLAlchemy adds
+    cargs[0] = cargs[0].replace(";Trusted_Connection=Yes", "")
+
+    # create token credential
+    raw_token = azure_credentials.get_token(TOKEN_URL).token.encode("utf-16-le")
+    token_struct = struct.pack(f"<I{len(raw_token)}s", len(raw_token), raw_token)
+
+    # apply it to keyword arguments
+    cparams["attrs_before"] = {SQL_COPT_SS_ACCESS_TOKEN: token_struct}
+```
+
+在 Microsoft Azure 端則使用 Managed Identity 方式進行無密碼驗證，詳細步驟可參閱 https://learn.microsoft.com/en-us/azure/azure-sql/database/azure-sql-passwordless-migration-python，
+此文件雖是使用 Azure App Service 作作為範例，但建立 User Assigned Managed Identity 與設定 Azure SQL Database 存取權限等方式是相同的。
+
 
 ## 單純在開發環境執行此程式碼
 
@@ -63,11 +120,14 @@ streamlit run main.py
 docker build -t streamlit-app:1 .
 ```
 
-### 在本機執行與測試 Container Image，例如
+### 在本機執行與測試 Container Image
+若未使用 Microsoft Entra ID 進行身分驗證，在本機端可以如下執行容器進行測試
 ```bash
 docker run -dit --name streamlit-app -p 8501:8501 streamlit-app:1
 ```
-以瀏覽器開啟 http://localhost:8501/ 即可進行測試
+執行以上命令後，以瀏覽器開啟 http://localhost:8501/ 即可進行測試。
+
+但若是使用 Microsoft Entra ID 進行身分驗證，考量安全因素，目前無法直接在本機端取得 Microsoft Entra ID 之前登入過之 DefaultAzureCredential 進行測試，此議題在 https://github.com/Azure/azure-sdk-for-net/issues/19167 已經討論很長的時間，但目前尚未有很好的解決方案，採用 Microsoft Entra ID 服務主體 (Service Principal) 進行身分驗證是可能的方案之一。
 
 
 ## 手動以容器方式部署於 Microsoft Azure
@@ -100,6 +160,18 @@ kubectl apply -f tls-traefik-ingress-name-route.yaml
 az containerapp create --name ca-streamlitapp  --resource-group <您的資源群組> --environment <您的 Azure Container Apps 環境名稱> --image <您的ACR名稱>.azurecr.io/streamlit-app:1 --target-port 8501 --ingress external --registry-server <您的ACR名稱>.azurecr.io --query properties.configuration.ingress.fqdn
 ```
 若順利部署完畢會顯示 URL 以供存取
+
+## 使用 Microsoft Entra ID 搭配 Managed Identity 方式進行 Azure SQL Database 無密碼身分驗證
+
+雲端環境需設定以下環境變數
+
+```bash
+AZURE_CLIENT_ID = <您的 Azure Managed Identity Client ID>
+```
+ 由 Azure Portal 中可以取得 Managed Identity 的 Client ID，如下圖所示
+ ![使用者介面](/images/managedidentity-clientid.png)
+
+
 
 ## 以 Azure Developer CLI 自動化部署於 Microsoft Azure
 
