@@ -1,7 +1,7 @@
 # 關於本範例
 本範例是使用 [Streamlit](https://streamlit.io/) 與 [Langchain](https://python.langchain.com/docs/get_started/introduction.html) 搭配 Azure OpenAI Service 實作的對話機器人，並依照 [Vector Similarity Search with Azure SQL database and OpenAI](https://devblogs.microsoft.com/azure-sql/vector-similarity-search-with-azure-sql-database-and-openai/) 一文的說明，將 [OpenAI 所提供的 Simple English Wikipedia 主要條目的 Embedding 向量資料](https://cdn.openai.com/API/examples/data/vector_database_wikipedia_articles_embedded.zip) 儲存於 Azure SQL Database 內，以對話機器人的方式對 Azure SQL Database 進行全文檢索，並採用餘弦近似比對的方式找出與 Simple English Wikipedia 內最相近的內容。 程式碼皆位於 src 資料夾內，其餘資料夾不包含程式碼，都與環境部屬相關。若目前尚未有 Azure OpenAI Service 與 LangChain 開發經驗，也可先透過此[中文快速上手 Notebook 加速學習](https://github.com/tomleetaiwan/azure_openai_quick_start)。 
 
-**本範例僅是功能示範，將 OpenAI API Key 與 SQL Server 連接字串儲存於環境變數中並非符合資訊安全的作法，請勿直接使用於對外開放之 Microsoft Azure 環境。**
+**本範例僅是功能示範，將 OpenAI API Key 與 SQL Server 連接字串儲存於環境變數中並非符合資訊安全的作法，請勿直接使用於對外開放之 Microsoft Azure 環境。此外[ Azure SQL Database 內建支援向量搜尋功能已經於2023年11月進入到公開技術預覽階段，前述方法未來將有所改變](https://devblogs.microsoft.com/azure-sql/vector-search-with-azure-sql-database/)**
 
  ![使用者介面](/images/streamlit-app-ui.png)
 
@@ -15,22 +15,22 @@
     + text-embedding-ada-002        
 - 備妥 Python 3.11 編輯與執行環境
 - 備妥 以下 Python 套件
-    + python-dotenv
-    + langchain
-    + langchain-core
-    + langchain-openai
-    + langchain-community
-    + tiktoken
-    + wikipedia
-    + streamlit
-    + streamlit-chat
-    + pyodbc
-    + sqlalchemy
-    + pandas
-    + azure.identity
+    + python-dotenv (1.0.0)
+    + langchain (0.3.2)
+    + langchain-core (0.3.9)
+    + langchain-openai (0.2.2)
+    + langchain-community (0.3.1)
+    + tiktoken (0.8.0)
+    + wikipedia (1.4.0)
+    + streamlit (1.39.0)
+    + streamlit-chat (0.1.1)
+    + pyodbc (4.0.39)
+    + sqlalchemy (2.0.19)
+    + pandas (1.5.3)
+    + azure.identity (1.18.0)
 
 - 備妥 Docker 容器環境 (選用)
-- 若在 Linux 環境進行開發，須備妥 [Microsoft ODBC 18 環境](https://learn.microsoft.com/zh-tw/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=alpine18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline#17)
+- 若在 Linux 環境進行開發，須備妥 [Microsoft ODBC 18 環境](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=debian18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline)
 
 所需的兩種模型，可點選 [Azure AI Studio](https://oai.azure.com/portal) 標示之 **Deployments** 選項，即可依序建立部署，請紀錄模型之部署名稱，後續需要輸入環境變數之中。
 
@@ -98,10 +98,6 @@ def provide_token(dialect, conn_rec, cargs, cparams):
     cparams["attrs_before"] = {SQL_COPT_SS_ACCESS_TOKEN: token_struct}
 ```
 
-在 Microsoft Azure 端則使用 Managed Identity 方式進行無密碼驗證，詳細步驟可參閱 https://learn.microsoft.com/en-us/azure/azure-sql/database/azure-sql-passwordless-migration-python，
-此文件雖是使用 Azure App Service 作作為範例，但建立 User Assigned Managed Identity 與設定 Azure SQL Database 存取權限等方式是相同的。
-
-
 ## 單純在開發環境執行此程式碼
 
 在命令列模式下切換至 /src 資料夾，並執行以下指令
@@ -128,7 +124,6 @@ docker run -dit --name streamlit-app -p 8501:8501 streamlit-app:1
 執行以上命令後，以瀏覽器開啟 http://localhost:8501/ 即可進行測試。
 
 但若是使用 Microsoft Entra ID 進行身分驗證，考量安全因素，目前無法直接在本機端取得 Microsoft Entra ID 之前登入過之 DefaultAzureCredential 進行測試，此議題在 https://github.com/Azure/azure-sdk-for-net/issues/19167 已經討論很長的時間，但目前尚未有很好的解決方案，採用 Microsoft Entra ID 服務主體 (Service Principal) 進行身分驗證是可能的方案之一。
-
 
 ## 手動以容器方式部署於 Microsoft Azure
 
@@ -161,17 +156,64 @@ az containerapp create --name ca-streamlitapp  --resource-group <您的資源群
 ```
 若順利部署完畢會顯示 URL 以供存取
 
-## 使用 Microsoft Entra ID 搭配 Managed Identity 方式進行 Azure SQL Database 無密碼身分驗證
+## 在 Microsoft Azure 上使用 Managed Identity 方式進行無密碼驗證
+在 Microsoft Azure 端則使用 Managed Identity 方式進行無密碼驗證，詳細步驟可參閱 https://learn.microsoft.com/en-us/azure/azure-sql/database/azure-sql-passwordless-migration-python，
+此文件雖是使用 Azure App Service 作作為範例，但建立 User Assigned Managed Identity 與設定 Azure SQL Database 存取權限等方式是相同的。可以透過 Azure CLI 建立 User Assigned Managed Identity，例如 
+
+```bash
+az identity create --name <User Assigned Managed Identity 名稱> --resource-group <您的資源群組>
+```
+
+接下來可將建立妥的 User Assigned Managed Identity 與 Azure Container Apps 進行綁定
+
+![使用者介面](/images/bindmanagedidentity.png)
+
+Azure Kubernetes Service 目前無法在 Azure Portal 直接綁定 User Assigned Managed Identity，需要透過 Azure CLI 進行綁定，如下先取得先前建立的 User Assigned Managed Identity 之 Resource ID。
+
+```bash
+RESOURCE_ID=$(az identity show \
+    --name <User Assigned Managed Identity 名稱> \
+    --resource-group <您的資源群組> \
+    --query id \
+    --output tsv)
+```    
+接下來可以透過以下指令將 User Assigned Managed Identity 與現有 Azure Kubernetes Service 叢集進行綁定
+
+```bash
+az aks update \
+    --resource-group <您的資源群組> \
+    --name <AKS名稱> \
+    --enable-managed-identity \
+    --assign-identity $RESOURCE_ID
+```
+新建立的 User Assigned Managed Identity 綁定應用程式所在的 Azure Container App 或 Azure Kubernetes Service 後，還需要將此 User Assigned Managed Identity 授予 Azure SQL Database 內預設角色 SQL DB Contributor，以便於實現 Azure SQL Database 伺服器層級無密碼身分驗證。
+
+![使用者介面](/images/azuresql-iam.png)
+
+SQL DB Contributor 角色具備 Azure SQL Database 資料庫連接與管理之權限，卻不具備存取 SQL Server 資料庫內資料之權限。因此需要將 User Assigned Managed Identity 加入至 SQL Server 資料庫各種預設存取角色中，例如
+
+```sql
+CREATE USER [<User Assigned Managed Identity 名稱>] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [<User Assigned Managed Identity 名稱>];
+ALTER ROLE db_datawriter ADD MEMBER [<User Assigned Managed Identity 名稱>];
+ALTER ROLE db_ddladmin ADD MEMBER [<User Assigned Managed Identity 名稱>];
+GO
+```
+
+## 使用 Microsoft Entra ID 搭配 Managed Identity 方式讓 Azure Container Apps 以無密碼身分驗證存取 Azure SQL Database 
 
 雲端環境需設定以下環境變數
 
 ```bash
-AZURE_CLIENT_ID = <您的 Azure Managed Identity Client ID>
+AZURE_CLIENT_ID = <您的 Azure Managed Identity 的 Client ID>
 ```
  由 Azure Portal 中可以取得 Managed Identity 的 Client ID，如下圖所示
+
  ![使用者介面](/images/managedidentity-clientid.png)
 
+可以透過 Azure Portal 將環境變數 AZURE_CLIENT_ID 加入至 Azure Container Apps 的設定中，如下圖所示
 
+ ![使用者介面](/images/conatinerapps-envvar.png)
 
 ## 以 Azure Developer CLI 自動化部署於 Microsoft Azure
 
